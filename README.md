@@ -1,1 +1,1 @@
-# otus_hw
+# Sergey Urzhumtsev Otus RDBMS Home Tasks
