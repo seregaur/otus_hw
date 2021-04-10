@@ -11,21 +11,38 @@ main()
 {
   create_pg_server "${PG_CONTAINER_NAME}" "${TASK_DATA_DIR}/master" "5432"
 
-  until (do_sql_cmd "${PG_CONTAINER_NAME}" "select 1"); do
-    sleep 1
-    echo -n "."
-  done
+  wait_pg_container "${PG_CONTAINER_NAME}"
 
-  prepare_server_for_replication "${PG_CONTAINER_NAME}"
+  prepare_server_for_replication "${PG_CONTAINER_NAME}" "${TASK_DATA_DIR}/master"
+
+  docker stop "${PG_CONTAINER_NAME}"
+  create_pg_server "${PG_CONTAINER_NAME}" "${TASK_DATA_DIR}/master" "5432"
+  wait_pg_container "${PG_CONTAINER_NAME}"
+
   prepare_replica_data "${PG_CONTAINER_NAME}" "${TASK_DATA_DIR}/replica1" "test_slot" "5min"
 
   create_pg_server "replica1" "${TASK_DATA_DIR}/replica1" "5433"
 
-  do_sql_cmd "{PG_CONTAINER_NAME}" "drop database test_data" || echo
-  do_sql_cmd "{PG_CONTAINER_NAME}" "create database test_data"
+  do_sql_cmd "${PG_CONTAINER_NAME}" "drop database ${PG_TESTDB_NAME}" || echo
+  do_sql_cmd "${PG_CONTAINER_NAME}" "create database ${PG_TESTDB_NAME}"
 
-  cat ${WORKDIR}/test-ddl.sql | docker exec -u 999 -i ${PG_CONTAINER_NAME} psql -d test_data -f -
-  cat ${WORKDIR}/test-data.sql | docker exec -u 999 -i ${PG_CONTAINER_NAME} psql -d test_data -f -
+  cat ${WORKDIR}/test-ddl.sql | docker exec -u 999 -i ${PG_CONTAINER_NAME} psql -d ${PG_TESTDB_NAME} -f -
+  cat ${WORKDIR}/test-data.sql | docker exec -u 999 -i ${PG_CONTAINER_NAME} psql -d ${PG_TESTDB_NAME} -f -
+
+  do_sql_cmd "${PG_CONTAINER_NAME}" "create publication account_publ for table accounts" "${PG_TESTDB_NAME}"
+
+  create_pg_server "${PG_LOGICAL_REPLICA}" "${TASK_DATA_DIR}/logical_replica"
+  wait_pg_container "${PG_LOGICAL_REPLICA}"
+
+  do_sql_cmd "${PG_LOGICAL_REPLICA}" "drop database ${PG_TESTDB_NAME}" || echo
+  do_sql_cmd "${PG_LOGICAL_REPLICA}" "create database ${PG_TESTDB_NAME}"
+
+  cat test-ddl.sql | docker exec -u 999 -i ${PG_LOGICAL_REPLICA}  psql -d ${PG_TESTDB_NAME} -f -
+
+  local connection="host=${PG_CONTAINER_NAME} port=5432 user=postgres password=${PG_ADMIN_PASS} dbname=${PG_TESTDB_NAME}"
+
+  local create_subscription="create subscription accounts_sub connection '${connection}' publication account_publ"
+  do_sql_cmd "${PG_LOGICAL_REPLICA}" "${create_subscription}" "${PG_TESTDB_NAME}"
 }
 
 create_pg_server()
@@ -46,31 +63,46 @@ create_pg_server()
     ${PG_IMAGE}
 }
 
+wait_pg_container()
+{
+  local container_name=$1
+  until (do_sql_cmd "${container_name}" "select 1"); do
+    sleep 1
+    echo -n "."
+  done
+}
+
 do_sql_cmd()
 {
   local server="${1}"
   local sqlquery="${2}"
+  local dbname="${3}"
+
+  local psql_arg="-qt"
+
+  if [ -n "${dbname}" ]; then
+    psql_arg+=" -d ${dbname}"
+  fi
 
   echo ${PG_ADMIN_PASS} | docker run -i --rm \
     --name psql_temp_container \
     --network ${PG_NETWORK} \
     ${PG_IMAGE} \
-    psql -qt -h postgres_srv -U postgres -c "${sqlquery}"
+    psql ${psql_arg} -h ${server} -U postgres -c "${sqlquery}"
 }
 
 prepare_server_for_replication()
 {
   local container_name="${1}"
+  local data_dir="${2}"
 
   if [ -z "$(do_sql_cmd "${container_name}" "SELECT 1 FROM pg_roles WHERE rolname='replicator'")" ]; then
     do_sql_cmd "${container_name}" "CREATE USER replicator WITH REPLICATION ENCRYPTED PASSWORD '${PG_REPLICATOR_PASS}'"
   fi
 
-  docker exec ${container_name} \
-    bash -c "cat /var/lib/postgresql/data/pg_hba.conf | grep -q 'host replication replicator all md5'" \
-  || (docker exec ${container_name} \
-        bash -c "echo 'host replication replicator all md5' >> /var/lib/postgresql/data/pg_hba.conf" &&
-      docker exec -u $PG_UID ${container_name} bash -c "pg_ctl reload")
+  echo 'host replication replicator all md5' | sudo tee -a "${data_dir}/pg_hba.conf"
+  sudo sed '/wal_level/d' -i "${data_dir}/postgresql.conf"
+  echo 'wal_level = logical' | sudo tee -a "${data_dir}/postgresql.conf"
 }
 
 prepare_replica_data()
