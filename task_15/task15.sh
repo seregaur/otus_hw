@@ -9,31 +9,39 @@ source ${WORKDIR}/env.sh
 
 main()
 {
+  echo "Создали мастера и ждем, пока запустится"
   create_pg_server "${PG_CONTAINER_NAME}" "${TASK_DATA_DIR}/master" "5432"
 
   wait_pg_container "${PG_CONTAINER_NAME}"
 
   prepare_server_for_replication "${PG_CONTAINER_NAME}" "${TASK_DATA_DIR}/master"
 
+  echo "Для применения wal_level перезапускаем ${PG_CONTAINER_NAME}"
   docker stop "${PG_CONTAINER_NAME}"
   create_pg_server "${PG_CONTAINER_NAME}" "${TASK_DATA_DIR}/master" "5432"
   wait_pg_container "${PG_CONTAINER_NAME}"
 
+  echo "Создаем реплику replica1 с отложенной репликацией на 5 минут и слотом репликации test_slot"
   prepare_replica_data "${PG_CONTAINER_NAME}" "${TASK_DATA_DIR}/replica1" "test_slot" "5min"
 
   create_pg_server "replica1" "${TASK_DATA_DIR}/replica1" "5433"
 
+  echo "Создаем БД ${PG_TESTDB_NAME} на "${PG_CONTAINER_NAME}""
   do_sql_cmd "${PG_CONTAINER_NAME}" "drop database ${PG_TESTDB_NAME}" || echo
   do_sql_cmd "${PG_CONTAINER_NAME}" "create database ${PG_TESTDB_NAME}"
 
+  echo "Создаем таблицу accounts и заполняем данными в ${PG_TESTDB_NAME} на ${PG_CONTAINER_NAME}"
   cat ${WORKDIR}/test-ddl.sql | docker exec -u 999 -i ${PG_CONTAINER_NAME} psql -d ${PG_TESTDB_NAME} -f -
   cat ${WORKDIR}/test-data.sql | docker exec -u 999 -i ${PG_CONTAINER_NAME} psql -d ${PG_TESTDB_NAME} -f -
 
+  echo "Создаем публикацию для логической репликации на ${PG_CONTAINER_NAME}"
   do_sql_cmd "${PG_CONTAINER_NAME}" "create publication account_publ for table accounts" "${PG_TESTDB_NAME}"
 
+  echo "Создаем сервер для логической репликации ${PG_LOGICAL_REPLICA}"
   create_pg_server "${PG_LOGICAL_REPLICA}" "${TASK_DATA_DIR}/logical_replica"
   wait_pg_container "${PG_LOGICAL_REPLICA}"
 
+  echo "Создаем БД, таблицу, и подключаем подписку"
   do_sql_cmd "${PG_LOGICAL_REPLICA}" "drop database ${PG_TESTDB_NAME}" || echo
   do_sql_cmd "${PG_LOGICAL_REPLICA}" "create database ${PG_TESTDB_NAME}"
 
@@ -43,6 +51,17 @@ main()
 
   local create_subscription="create subscription accounts_sub connection '${connection}' publication account_publ"
   do_sql_cmd "${PG_LOGICAL_REPLICA}" "${create_subscription}" "${PG_TESTDB_NAME}"
+
+  echo "Процесс завершен $(date)"
+
+  echo "Проверка логической реплики:"
+  do_sql_cmd ${PG_LOGICAL_REPLICA} "select * from accounts" "${PG_TESTDB_NAME}"
+  echo "Удалим запись на ${PG_CONTAINER_NAME}:"
+  do_sql_cmd ${PG_CONTAINER_NAME} "delete from accounts where user_id=9" "${PG_TESTDB_NAME}"
+  echo "Содержимое реплики:"
+  do_sql_cmd ${PG_LOGICAL_REPLICA} "select * from accounts" "${PG_TESTDB_NAME}"
+  echo "Для проверки реплики с отложенной репликацией нужно через 5 минут выполнить команду:"
+  echo "docker exec -u 999 -it replica1 psql -d ${PG_TESTDB_NAME} -c 'select * from accounts'"
 }
 
 create_pg_server()
@@ -88,7 +107,7 @@ do_sql_cmd()
     --name psql_temp_container \
     --network ${PG_NETWORK} \
     ${PG_IMAGE} \
-    psql ${psql_arg} -h ${server} -U postgres -c "${sqlquery}"
+    psql 2>/dev/null ${psql_arg} -h ${server} -U postgres -c "${sqlquery}"
 }
 
 prepare_server_for_replication()
