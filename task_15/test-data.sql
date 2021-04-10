@@ -1,0 +1,9 @@
+INSERT INTO accounts(username,password,email) values ('User 1', 'Password 1', 'email1@email.org');
+INSERT INTO accounts(username,password,email) values ('User 2', 'Password 2', 'email2@email.org');
+INSERT INTO accounts(username,password,email) values ('User 3', 'Password 3', 'email3@email.org');
+INSERT INTO accounts(username,password,email) values ('User 4', 'Password 4', 'email4@email.org');
+INSERT INTO accounts(username,password,email) values ('User 5', 'Password 5', 'email5@email.org');
+INSERT INTO accounts(username,password,email) values ('User 6', 'Password 6', 'email6@email.org');
+INSERT INTO accounts(username,password,email) values ('User 7', 'Password 7', 'email7@email.org');
+INSERT INTO accounts(username,password,email) values ('User 8', 'Password 8', 'email8@email.org');
+INSERT INTO accounts(username,password,email) values ('User 9', 'Password 9', 'email9@email.org');
