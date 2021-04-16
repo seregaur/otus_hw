@@ -35,9 +35,11 @@ sysbench \
     --table_size=10000000 --tables=10 --threads=5 \
     /usr/share/sysbench/oltp_read_write.lua run
 ```
+- [полученный результат](sysbench_before_tuning.md)
 - добавил кастомный сконфиг, перезапустил контейнер 
 ```
 sudo cp my-custom-params.cnf ./custm.conf/
 docker-compose down -v && docker-compose up -d
 ```
 - запустил `sysbench` с теми же параметрами
+- [полученный результат](sysbench_after_tuning.md)
