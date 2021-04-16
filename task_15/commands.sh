@@ -7,7 +7,7 @@ DES3_PASSWD="password"
 WORKDIR=$(dirname "$(realpath "$0")")
 PROJECT_DIR=$(dirname "${WORKDIR}")
 
-DATA_DIR="${PROJECT_DIR}/data/task_29"
+DATA_DIR="${PROJECT_DIR}/data/task_15"
 
 mkdir -p ${DATA_DIR}/{backup,mysql}
 
@@ -28,8 +28,8 @@ docker run -i --name percona-xtrabackup --rm \
 
 docker run -d --name percona-server --rm \
   -e MYSQL_ROOT_PASSWORD=12345 \
-  -v $HOME/otus_hw/data/task_29/backup:/backup \
-  -v $HOME/otus_hw/data/task_29/mysql:/var/lib/mysql \
+  -v $HOME/otus_hw/data/task_15/backup:/backup \
+  -v $HOME/otus_hw/data/task_15/mysql:/var/lib/mysql \
   percona/percona-server:8.0
 
 until (docker exec -it percona-server mysql -s -u root --password=12345 -e 'select 1'); do
