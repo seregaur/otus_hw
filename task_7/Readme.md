@@ -32,7 +32,7 @@ sysbench \
     --mysql-password=12345 \
     --db-driver=mysql \
     --mysql-db=otus \
-    --table_size=10000000 --tables=10 --threads=5 \
+    --table_size=1000000 --tables=10 --threads=5 \
     /usr/share/sysbench/oltp_read_write.lua run
 ```
 - [полученный результат](sysbench_before_tuning.md)
