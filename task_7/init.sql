@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS `cities` (
 CREATE TABLE IF NOT EXISTS `streets` (
   `street_id` int PRIMARY KEY AUTO_INCREMENT,
   `city_id` int,
-  `city_name` varchar(255)
+  `street_name` varchar(255)
 );
 
 CREATE TABLE IF NOT EXISTS `postal_codes` (
