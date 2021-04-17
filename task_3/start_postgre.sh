@@ -8,8 +8,6 @@ PROJECT_DIR=$(dirname "${WORKDIR}")
 
 PG_DATADIR="${PROJECT_DIR}/data/postgres"
 PGADMIN_DATADIR="${PROJECT_DIR}/data/pgadmin"
-PG_IMAGE="postgres:13"
-PG_PASS="FmbeSSJUOvxX6wLB"
 PGADMIN_DEFAULT_EMAIL="admin@localhost"
 PGADMIN_DEFAULT_PASSWORD="VDgwcc8h"
 WEB_UI_URL="http://127.0.0.1"
